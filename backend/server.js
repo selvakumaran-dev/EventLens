@@ -31,21 +31,21 @@ await connectDB();
 
 const app = express();
 
-// ── CORS ─────────────────────────────────────────────────────────────────────
 // Parse the comma-separated ALLOWED_ORIGINS env var for multi-origin support
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
-  .map((o) => o.trim())
+  .map((o) => o.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (mobile apps, Postman, curl) in dev
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
         return callback(null, true);
       }
-      callback(new Error(`CORS policy: Origin "${origin}" is not allowed.`));
+      console.warn(`⚠️ CORS blocked request from origin: ${origin}`);
+      callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
