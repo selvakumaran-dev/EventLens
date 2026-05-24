@@ -169,7 +169,7 @@ export default function GuestInterface() {
         capturedDescriptorsRef.current,
         photoCacheRef.current,
         0.45,   // strict threshold
-        0.60    // loose threshold
+        0.65    // loose threshold
       );
 
       setMatchedPhotos(matches);
@@ -512,15 +512,13 @@ export default function GuestInterface() {
                 ? `${all.length} photo${all.length !== 1 ? 's' : ''} found`
                 : 'No matches found'}
             </h2>
-            {strict.length > 0 && loose.length > 0 && (
-              <p className="text-text-muted text-xs mt-0.5 font-medium">
-                <span className="text-rose font-bold">{strict.length} confident</span>
-                {' '}+ {loose.length} possible match{loose.length !== 1 ? 'es' : ''}
-              </p>
-            )}
             {all.length > 0 && (
               <p className="text-text-muted text-xs mt-0.5 font-medium">
-                Tap any photo to download immediately
+                <span className="text-rose font-bold">{strict.length} confident</span> match{strict.length !== 1 ? 'es' : ''}
+                {loose.length > 0 && (
+                  <> and <span className="text-text-primary font-bold">{loose.length} possible</span> match{loose.length !== 1 ? 'es' : ''}</>
+                )}
+                {' · Tap to download'}
               </p>
             )}
           </div>
