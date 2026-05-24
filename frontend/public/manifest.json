@@ -1,0 +1,29 @@
+{
+  "short_name": "EventLens",
+  "name": "EventLens — Find Your Photos Instantly",
+  "description": "EventLens uses AI face recognition to instantly surface your photos from any event. Scan your face, find your memories.",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0A0A0C",
+  "theme_color": "#FF4D8D",
+  "display": "standalone",
+  "orientation": "portrait"
+}

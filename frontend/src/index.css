@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Fonts are loaded via index.html <link> tags ─────────────────── */
+
+/* ── Base resets ─────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Prevent iOS bounce scroll on the page root */
+    overscroll-behavior: none;
+  }
+
+  body {
+    background-color: #FDF4FF;
+    color: #1A0A2E;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* iOS safe-area insets */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 77, 141, 0.2); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255, 77, 141, 0.4); }
+}
+
+/* ── Reusable component classes ──────────────────────────────────────────── */
+@layer components {
+
+  /* Premium Frosted Glass Card for Celebration light mode */
+  .glass-card {
+    @apply bg-white/75 backdrop-blur-lg border border-white/80 rounded-2xl;
+    box-shadow: 0 10px 30px rgba(255, 77, 141, 0.04), 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  }
+
+  /* Rose gradient primary button (replacing gold with beautiful pink-peach) */
+  .btn-rose {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5
+           font-semibold text-white tracking-wide
+           transition-all duration-200;
+    background-image: linear-gradient(to right, #FF4D8D, #FF8C61);
+  }
+  .btn-rose:hover {
+    box-shadow: 0 8px 30px rgba(255,77,141,0.25);
+    filter: brightness(1.05);
+  }
+  .btn-rose:active {
+    transform: scale(0.95);
+  }
+  .btn-rose:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-rose:disabled:active {
+    transform: none;
+  }
+
+  /* Backward compatibility alias for btn-gold */
+  .btn-gold {
+    @apply btn-rose;
+  }
+
+  /* Subtle secondary button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3
+           font-medium text-text-muted border border-lavender-light
+           transition-all duration-200;
+  }
+  .btn-ghost:hover {
+    @apply border-rose/30 text-rose bg-rose/5;
+  }
+  .btn-ghost:active {
+    transform: scale(0.95);
+  }
+
+  /* Floating-label input wrapper */
+  .input-floating {
+    @apply relative w-full;
+  }
+
+  .input-floating input {
+    @apply w-full bg-white/90 border border-lavender-light rounded-xl
+           px-4 pt-6 pb-2 text-text-primary
+           placeholder-transparent
+           transition-all duration-200;
+    caret-color: #FF4D8D;
+    outline: none;
+  }
+  .input-floating input:focus {
+    @apply border-rose/50 bg-white;
+  }
+
+  .input-floating label {
+    @apply absolute left-4 top-4 text-text-muted text-sm
+           transition-all duration-200 pointer-events-none;
+  }
+
+  .input-floating input:focus ~ label,
+  .input-floating input:not(:placeholder-shown) ~ label {
+    @apply top-2 text-[10px] text-rose tracking-wider uppercase;
+  }
+
+  /* Section header in Playfair Display */
+  .heading-serif {
+    @apply font-serif font-bold text-text-primary;
+  }
+
+  /* Rose-Peach gradient text */
+  .text-rose-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(to right, #FF4D8D, #FF8C61);
+  }
+
+  /* Backward compatibility alias for text-gold-gradient */
+  .text-gold-gradient {
+    @apply text-rose-gradient;
+  }
+
+  /* Celebration Ambient background glow blobs */
+  .ambient-glow {
+    @apply absolute rounded-full pointer-events-none;
+    background: radial-gradient(circle, rgba(255, 77, 141, 0.15) 0%, transparent 70%);
+    filter: blur(50px);
+    animation: float 6s ease-in-out infinite;
+  }
+
+  /* Shimmer skeleton loader for light celebration theme */
+  .skeleton {
+    @apply rounded-xl;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 214, 232, 0.3) 25%,
+      rgba(255, 214, 232, 0.6) 50%,
+      rgba(255, 214, 232, 0.3) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+}
+
+/* ── Custom keyframe animations not expressible in Tailwind ──────────────── */
+@layer utilities {
+  /* Stagger helper — apply delay via CSS var */
+  .stagger-delay {
+    animation-delay: var(--stagger, 0ms);
+  }
+
+  /* Safe-area bottom padding utility */
+  .pb-safe {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  /* iOS-safe full height */
+  .h-screen-safe {
+    height: 100dvh; /* Dynamic Viewport Height — handles iOS toolbar */
+  }
+}

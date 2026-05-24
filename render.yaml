@@ -1,0 +1,47 @@
+services:
+  # 1. Backend Web Service
+  - type: web
+    name: eventlens-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: MONGO_URI
+        sync: false
+        placeholder: "Your MongoDB Atlas connection string (mongodb+srv://...)"
+      - key: ADMIN_SECRET
+        sync: false
+        placeholder: "A secure password for the photographer dashboard"
+      - key: JWT_SECRET
+        generateValue: true # Generates a secure, random 256-bit signing key automatically!
+      - key: ALLOWED_ORIGINS
+        fromService:
+          type: static
+          name: eventlens-frontend
+          property: url
+
+  # 2. Frontend Static Site
+  - type: static
+    name: eventlens-frontend
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: eventlens-backend
+          property: url
+      - key: VITE_CLOUDINARY_CLOUD_NAME
+        sync: false
+        placeholder: "Your Cloudinary Cloud Name"
+      - key: VITE_CLOUDINARY_UPLOAD_PRESET
+        sync: false
+        placeholder: "Your Unsigned Cloudinary Upload Preset"
