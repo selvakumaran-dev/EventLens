@@ -21,10 +21,8 @@ services:
       - key: JWT_SECRET
         generateValue: true # Generates a secure, random 256-bit signing key automatically!
       - key: ALLOWED_ORIGINS
-        fromService:
-          type: web
-          name: eventlens-frontend
-          property: url
+        sync: false
+        placeholder: "Your frontend URL (e.g., https://eventlens-frontend.onrender.com)"
 
   # 2. Frontend Static Site (Defined as type: web with runtime: static)
   - type: web
@@ -40,10 +38,8 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: eventlens-backend
-          property: url
+        sync: false
+        placeholder: "Your backend URL (e.g., https://eventlens-backend.onrender.com)"
       - key: VITE_CLOUDINARY_CLOUD_NAME
         sync: false
         placeholder: "Your Cloudinary Cloud Name"
