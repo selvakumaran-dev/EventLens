@@ -93,6 +93,108 @@ function ConfettiEffect({ active }) {
   );
 }
 
+// Premium audio haptics synthesizer using Web Audio API (cross-browser compatible)
+function playFeedbackSound(phase) {
+  try {
+    // 1. Trigger haptic vibration with different patterns for a premium feel
+    if (navigator.vibrate) {
+      if (phase === 'front') {
+        // Single strong tap
+        navigator.vibrate(120);
+      } else if (phase === 'left') {
+        // Double tap
+        navigator.vibrate([80, 50, 80]);
+      } else if (phase === 'right') {
+        // Triple celebratory tap for completion
+        navigator.vibrate([80, 40, 80, 40, 150]);
+      } else {
+        // General tap
+        navigator.vibrate(50);
+      }
+    }
+
+    // 2. Play synthesized "vibrate sound" (sine + triangle waves with custom envelopes)
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    
+    // A. The low-frequency physical "vibration" hum
+    const lowOsc = ctx.createOscillator();
+    const lowGain = ctx.createGain();
+    lowOsc.type = 'triangle';
+    
+    // Frequency starts at 150Hz and slides down to simulate a physical motor vibration
+    lowOsc.frequency.setValueAtTime(150, now);
+    lowOsc.frequency.exponentialRampToValueAtTime(70, now + 0.35);
+    
+    lowGain.gain.setValueAtTime(0.4, now);
+    lowGain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+    
+    lowOsc.connect(lowGain);
+    lowGain.connect(ctx.destination);
+    
+    // B. The beautiful digital chime
+    const highOsc = ctx.createOscillator();
+    const highGain = ctx.createGain();
+    highOsc.type = 'sine';
+    
+    // Pitch varies depending on the scanning phase for interactive progression
+    let baseFreq = 880; // A5 (Front)
+    let endFreq = 1100;
+    let duration = 0.25;
+
+    if (phase === 'left') {
+      baseFreq = 1046.50; // C6 (Left)
+      endFreq = 1318.51;  // E6
+      duration = 0.3;
+    } else if (phase === 'right') {
+      baseFreq = 1318.51; // E6 (Right/Finish)
+      endFreq = 1760;     // A6
+      duration = 0.4;
+    }
+    
+    highOsc.frequency.setValueAtTime(baseFreq, now);
+    highOsc.frequency.exponentialRampToValueAtTime(endFreq, now + duration * 0.6);
+    
+    // Fade out smoothly
+    highGain.gain.setValueAtTime(0.12, now);
+    highGain.gain.exponentialRampToValueAtTime(0.005, now + duration);
+    
+    highOsc.connect(highGain);
+    highGain.connect(ctx.destination);
+    
+    // Start and stop both oscillators
+    lowOsc.start(now);
+    lowOsc.stop(now + 0.4);
+    
+    highOsc.start(now);
+    highOsc.stop(now + duration + 0.05);
+
+    // If it's the final phase (right), add a second celebratory tone a split-second later
+    if (phase === 'right') {
+      const completionOsc = ctx.createOscillator();
+      const completionGain = ctx.createGain();
+      completionOsc.type = 'sine';
+      completionOsc.frequency.setValueAtTime(2093, now + 0.15); // C7
+      
+      completionGain.gain.setValueAtTime(0, now);
+      completionGain.gain.setValueAtTime(0.08, now + 0.15);
+      completionGain.gain.exponentialRampToValueAtTime(0.005, now + 0.45);
+      
+      completionOsc.connect(completionGain);
+      completionGain.connect(ctx.destination);
+      
+      completionOsc.start(now + 0.15);
+      completionOsc.stop(now + 0.5);
+    }
+    
+  } catch (error) {
+    console.warn("Could not play synthesized sound feedback:", error);
+  }
+}
+
 // How many selfie frames to capture and average for accuracy
 const CAPTURE_FRAMES = 3;
 const CAPTURE_DELAY_MS = 400; // ms between frames
@@ -219,6 +321,24 @@ export default function GuestInterface() {
   const handleScan = useCallback(async () => {
     if (scanState !== STATE.READY) return;
 
+    // Warm up/unlock Web Audio context on user gesture for iOS/mobile compatibility
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        const warmUpCtx = new AudioContext();
+        if (warmUpCtx.state === 'suspended') {
+          const buffer = warmUpCtx.createBuffer(1, 1, 22050);
+          const source = warmUpCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(warmUpCtx.destination);
+          source.start(0);
+          warmUpCtx.resume();
+        }
+      }
+    } catch (e) {
+      console.warn("Audio warm-up failed", e);
+    }
+
     setScanState(STATE.CAPTURING);
     setCapturePhase('front');
     setCapturedAngles([]);
@@ -260,8 +380,8 @@ export default function GuestInterface() {
         setFlashActive(true);
         setTimeout(() => setFlashActive(false), 400);
 
-        // Success sound chime mock / haptic vibration API
-        if (navigator.vibrate) navigator.vibrate(40);
+        // Success sound chime & haptic vibration feedback
+        playFeedbackSound(currentPhase);
       } else {
         console.warn(`Could not capture face descriptor for angle: ${currentPhase}`);
         // If front fails, we immediately drop to no face detected because it is the baseline
