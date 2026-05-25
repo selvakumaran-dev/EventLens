@@ -133,7 +133,7 @@ export default function GuestInterface() {
   const capturedDescriptorsRef = useRef([]);
 
   // Match Sensitivity States
-  const [looseThreshold, setLooseThreshold] = useState(0.60); // 0.50 (Strict) | 0.60 (Balanced) | 0.68 (Inclusive)
+  const [looseThreshold, setLooseThreshold] = useState(0.60); // 0.50 (Strict) | 0.60 (Balanced)
   const [capturedDescriptors, setCapturedDescriptors] = useState(null);
 
   // ── Step 1: Load models + fetch vectors concurrently ─────────────────────
@@ -552,23 +552,11 @@ export default function GuestInterface() {
           <div className="flex items-center justify-between">
             <span className="text-text-primary text-[10px] sm:text-xs font-bold uppercase tracking-wider">Search Sensitivity</span>
             <span className="text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold bg-rose/10 text-rose">
-              {looseThreshold === 0.50 && 'Strict'}
-              {looseThreshold === 0.60 && 'Balanced (Default)'}
-              {looseThreshold === 0.68 && 'Inclusive'}
+              {looseThreshold === 0.50 ? 'Strict' : 'Balanced (Default)'}
             </span>
           </div>
           
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => setLooseThreshold(0.50)}
-              className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl border transition-all duration-200 ${
-                looseThreshold === 0.50
-                  ? 'bg-rose text-white border-rose shadow-sm shadow-rose/20'
-                  : 'bg-canvas text-text-muted border-rose-pale hover:border-rose/25'
-              }`}
-            >
-              Strict
-            </button>
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setLooseThreshold(0.60)}
               className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl border transition-all duration-200 ${
@@ -577,23 +565,23 @@ export default function GuestInterface() {
                   : 'bg-canvas text-text-muted border-rose-pale hover:border-rose/25'
               }`}
             >
-              Balanced
+              Balanced Mode
             </button>
             <button
-              onClick={() => setLooseThreshold(0.68)}
+              onClick={() => setLooseThreshold(0.50)}
               className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl border transition-all duration-200 ${
-                looseThreshold === 0.68
+                looseThreshold === 0.50
                   ? 'bg-rose text-white border-rose shadow-sm shadow-rose/20'
                   : 'bg-canvas text-text-muted border-rose-pale hover:border-rose/25'
               }`}
             >
-              Inclusive
+              Strict Mode (Only Me)
             </button>
           </div>
           <p className="text-[10px] text-text-muted font-semibold leading-relaxed">
-            {looseThreshold === 0.50 && '🔒 Strict: Filters out any potential lookalikes. Shows only clear matches.'}
-            {looseThreshold === 0.60 && '⚖️ Balanced: Recommended setting. Best trade-off between accuracy and matching side angles.'}
-            {looseThreshold === 0.68 && '🔍 Inclusive: Pulls in distant group photos and profile angles, but may occasionally include lookalikes.'}
+            {looseThreshold === 0.60
+              ? '⚖️ Balanced: Recommended setting. Best trade-off between capturing natural poses and keeping other people out.'
+              : '🔒 Strict: Filters out any potential lookalikes. Shows only clear, front-facing matches of you.'}
           </p>
         </div>
 
