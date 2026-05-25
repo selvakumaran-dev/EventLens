@@ -132,6 +132,10 @@ export default function GuestInterface() {
   const [flashActive,      setFlashActive]      = useState(false);
   const capturedDescriptorsRef = useRef([]);
 
+  // Match Sensitivity States
+  const [looseThreshold, setLooseThreshold] = useState(0.60); // 0.50 (Strict) | 0.60 (Balanced) | 0.68 (Inclusive)
+  const [capturedDescriptors, setCapturedDescriptors] = useState(null);
+
   // ── Step 1: Load models + fetch vectors concurrently ─────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -160,28 +164,45 @@ export default function GuestInterface() {
     return () => { cancelled = true; };
   }, [eventId]);
 
+  // Dynamic face matching filter based on current threshold
+  useEffect(() => {
+    if (!capturedDescriptors || !photoCacheRef.current.length) return;
+
+    let active = true;
+    const runFilter = async () => {
+      try {
+        const matches = await findMatchingPhotosAsync(
+          capturedDescriptors,
+          photoCacheRef.current,
+          0.45,           // strict threshold
+          looseThreshold  // dynamic loose threshold
+        );
+        if (!active) return;
+        setMatchedPhotos(matches);
+        
+        // Show confetti only on the initial scan completion
+        if (scanState === STATE.SCANNING) {
+          if (matches.all.length > 0) {
+            setShowConfetti(true);
+          }
+        }
+        setScanState(STATE.RESULTS);
+      } catch (err) {
+        if (active) {
+          setErrorMsg(err.message || 'Face analysis failed.');
+          setScanState(STATE.ERROR);
+        }
+      }
+    };
+
+    runFilter();
+    return () => { active = false; };
+  }, [capturedDescriptors, looseThreshold]);
+
   const runVectorSearchAndMatch = async () => {
     setScanState(STATE.SCANNING);
-
-    try {
-      // Perform client-side multi-vector search (using non-blocking Web Worker)
-      const matches = await findMatchingPhotosAsync(
-        capturedDescriptorsRef.current,
-        photoCacheRef.current,
-        0.45,   // strict threshold
-        0.65    // loose threshold
-      );
-
-      setMatchedPhotos(matches);
-      setScanState(STATE.RESULTS);
-
-      if (matches.all.length > 0) {
-        setShowConfetti(true);
-      }
-    } catch (err) {
-      setErrorMsg(err.message || 'Face analysis failed.');
-      setScanState(STATE.ERROR);
-    }
+    // Setting this state triggers the matching useEffect above
+    setCapturedDescriptors([...capturedDescriptorsRef.current]);
   };
 
   // Failsafe: manual skip override to process whatever has been successfully captured
@@ -267,6 +288,7 @@ export default function GuestInterface() {
     setFlashActive(false);
     setShowConfetti(false);
     capturedDescriptorsRef.current = [];
+    setCapturedDescriptors(null);
     setScanState(STATE.READY);
   };
 
@@ -523,6 +545,56 @@ export default function GuestInterface() {
             )}
           </div>
           <button onClick={handleRescan} className="btn-ghost text-xs px-4 py-2 font-semibold">Re-scan</button>
+        </div>
+
+        {/* Sensitivity Selector */}
+        <div className="mx-4 p-4 rounded-2xl border border-rose-pale bg-white shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-text-primary text-[10px] sm:text-xs font-bold uppercase tracking-wider">Search Sensitivity</span>
+            <span className="text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-bold bg-rose/10 text-rose">
+              {looseThreshold === 0.50 && 'Strict'}
+              {looseThreshold === 0.60 && 'Balanced (Default)'}
+              {looseThreshold === 0.68 && 'Inclusive'}
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setLooseThreshold(0.50)}
+              className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl border transition-all duration-200 ${
+                looseThreshold === 0.50
+                  ? 'bg-rose text-white border-rose shadow-sm shadow-rose/20'
+                  : 'bg-canvas text-text-muted border-rose-pale hover:border-rose/25'
+              }`}
+            >
+              Strict
+            </button>
+            <button
+              onClick={() => setLooseThreshold(0.60)}
+              className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl border transition-all duration-200 ${
+                looseThreshold === 0.60
+                  ? 'bg-rose text-white border-rose shadow-sm shadow-rose/20'
+                  : 'bg-canvas text-text-muted border-rose-pale hover:border-rose/25'
+              }`}
+            >
+              Balanced
+            </button>
+            <button
+              onClick={() => setLooseThreshold(0.68)}
+              className={`py-2 text-[10px] sm:text-xs font-bold rounded-xl border transition-all duration-200 ${
+                looseThreshold === 0.68
+                  ? 'bg-rose text-white border-rose shadow-sm shadow-rose/20'
+                  : 'bg-canvas text-text-muted border-rose-pale hover:border-rose/25'
+              }`}
+            >
+              Inclusive
+            </button>
+          </div>
+          <p className="text-[10px] text-text-muted font-semibold leading-relaxed">
+            {looseThreshold === 0.50 && '🔒 Strict: Filters out any potential lookalikes. Shows only clear matches.'}
+            {looseThreshold === 0.60 && '⚖️ Balanced: Recommended setting. Best trade-off between accuracy and matching side angles.'}
+            {looseThreshold === 0.68 && '🔍 Inclusive: Pulls in distant group photos and profile angles, but may occasionally include lookalikes.'}
+          </p>
         </div>
 
         {/* Dynamic ZIP Batch Download and Progress */}
