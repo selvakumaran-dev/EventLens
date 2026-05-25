@@ -243,110 +243,136 @@ export default function AdminDashboard() {
     setUploadSuccess('');
   };
 
-  // ── STEP 2: Upload files to Cloudinary ────────────────────────────────────
-  const handleUploadToCloudinary = async () => {
+  // ── ONE-CLICK LIGHTNING UPLOAD & PROCESS ──────────────────────────────────
+  const handleLightningUploadAndProcess = async () => {
     if (!selectedEventId) return setUploadError('⚠️ Select an event first.');
     if (!selectedFiles.length) return setUploadError('⚠️ Add photos first.');
+    if (!modelsReady) {
+      return setUploadError('⚠️ AI models still loading. Please wait a moment and try again.');
+    }
 
     if (!CLOUD_NAME || !UPLOAD_PRESET) {
       return setUploadError(
-        '⚠️ Cloudinary not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to frontend/.env and restart Vite.'
+        '⚠️ Cloudinary not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to frontend/.env.'
       );
     }
 
     setUploading(true);
     setUploadError('');
-    setUploadProgress({ done: 0, total: selectedFiles.length, phase: 'Uploading to Cloudinary' });
-
-    const results = [];
-    for (let i = 0; i < selectedFiles.length; i++) {
-      try {
-        const { file } = selectedFiles[i];
-        const result = await uploadToCloudinary(file, selectedEventId, (pct) => {
-          setUploadProgress({
-            done: i + (pct / 100),
-            total: selectedFiles.length,
-            phase: `Uploading ${file.name} (${pct}%)`
-          });
-        });
-        results.push(result);
-      } catch (err) {
-        console.warn('Upload failed for', selectedFiles[i].file.name, err.message);
-        setUploadError(`⚠️ File "${selectedFiles[i].file.name}" failed: ${err.message}`);
-      }
-      setUploadProgress({ done: i + 1, total: selectedFiles.length, phase: 'Uploading to Cloudinary' });
-    }
-
-    // Clean up all object URLs once uploaded to release memory
-    selectedFiles.forEach((item) => {
-      if (item.previewUrl) {
-        URL.revokeObjectURL(item.previewUrl);
-      }
-    });
-
-    setUploadedUrls((prev) => [...prev, ...results]);
-    setSelectedFiles([]);
-    setUploading(false);
-
-    if (results.length === 0) {
-      setUploadError('All uploads failed. Check your Cloudinary credentials.');
-    }
-  };
-
-  // ── STEP 3: Extract faces + save to MongoDB ───────────────────────────────
-  const handleProcessAndSave = async () => {
-    if (!uploadedUrls.length) return setUploadError('⚠️ Upload photos first.');
-    if (!selectedEventId)     return setUploadError('⚠️ Select an event first.');
-    if (!modelsReady) {
-      return setUploadError('⚠️ AI models still loading. Please wait a moment and try again.');
-    }
-
-    setProcessingFaces(true);
-    setUploadError('');
     setUploadSuccess('');
-    setUploadProgress({ done: 0, total: uploadedUrls.length, phase: 'Extracting faces' });
+    setUploadProgress({ done: 0, total: selectedFiles.length, phase: 'Initializing parallel workers...' });
 
     const photoDocs = [];
+    let completedCount = 0;
 
-    for (let i = 0; i < uploadedUrls.length; i++) {
-      const { url, publicId } = uploadedUrls[i];
-      try {
+    // Helper: Local Image Loader (Loads File into memory directly - 0 network delay)
+    const loadImageLocally = (file) => {
+      return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise((res, rej) => {
-          img.onload  = res;
-          img.onerror = rej;
-          img.src     = url;
-        });
+        const objectUrl = URL.createObjectURL(file);
+        
+        img.onload = () => resolve({ img, objectUrl });
+        img.onerror = (err) => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Failed to load local image file.'));
+        };
+        img.src = objectUrl;
+      });
+    };
 
-        const descriptors = await extractAllDescriptors(img);
+    // Parallel Worker Function for a single photo
+    const processSinglePhoto = async (item) => {
+      const { file } = item;
+      let descriptors = [];
+      let uploadResult = null;
 
+      // Pipeline Step A (AI extraction) & Step B (Cloudinary upload) in parallel!
+      const aiTask = (async () => {
+        try {
+          const { img, objectUrl } = await loadImageLocally(file);
+          descriptors = await extractAllDescriptors(img);
+          URL.revokeObjectURL(objectUrl); // Release memory immediately!
+        } catch (aiErr) {
+          console.warn(`⚠️ AI processing failed locally for ${file.name}:`, aiErr.message);
+        }
+      })();
+
+      const uploadTask = (async () => {
+        try {
+          uploadResult = await uploadToCloudinary(file, selectedEventId, null);
+        } catch (uploadErr) {
+          throw new Error(`Cloudinary upload failed for "${file.name}": ${uploadErr.message}`);
+        }
+      })();
+
+      // Wait for BOTH AI extraction and Cloudinary upload to complete in parallel
+      await Promise.all([aiTask, uploadTask]);
+
+      if (uploadResult) {
         photoDocs.push({
-          eventId:    selectedEventId,
-          storageUrl: url,
-          cloudinaryPublicId: publicId,
+          eventId: selectedEventId,
+          storageUrl: uploadResult.url,
+          cloudinaryPublicId: uploadResult.publicId,
           faceDescriptors: descriptors.map((d) => ({ vector: Array.from(d) })),
         });
-      } catch (err) {
-        console.warn(`Face extraction skipped for ${url}:`, err.message);
       }
-      setUploadProgress({ done: i + 1, total: uploadedUrls.length, phase: 'Extracting faces' });
+
+      completedCount++;
+      setUploadProgress({
+        done: completedCount,
+        total: selectedFiles.length,
+        phase: `Processed ${completedCount} of ${selectedFiles.length} photos...`
+      });
+    };
+
+    // Sliding Concurrency Queue (Max 3 concurrent workers to protect CPU/RAM)
+    const concurrency = 3;
+    const executing = new Set();
+    const errors = [];
+
+    for (const item of selectedFiles) {
+      const p = processSinglePhoto(item).catch((err) => {
+        console.error(err);
+        errors.push(err.message);
+      });
+      executing.add(p);
+
+      const clean = () => executing.delete(p);
+      p.then(clean, clean);
+
+      if (executing.size >= concurrency) {
+        await Promise.race(executing);
+      }
+    }
+    // Wait for trailing workers to complete
+    await Promise.all(executing);
+
+    // Clean up all object URLs to release memory
+    selectedFiles.forEach((item) => {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    });
+
+    if (photoDocs.length === 0) {
+      setUploading(false);
+      return setUploadError(`⚠️ All photo processing failed: ${errors.join(', ')}`);
     }
 
-    // Bulk save in 200-doc batches
+    // STEP 4: Bulk Save to MongoDB
     try {
-      setUploadProgress({ done: 0, total: 1, phase: 'Saving to database' });
+      setUploadProgress({ done: selectedFiles.length, total: selectedFiles.length, phase: 'Saving metadata to MongoDB...' });
       const BATCH = 200;
       for (let b = 0; b < photoDocs.length; b += BATCH) {
         await api.post('/api/admin/upload-metadata', { photos: photoDocs.slice(b, b + BATCH) });
       }
-      setUploadSuccess(`✓ ${photoDocs.length} photo${photoDocs.length !== 1 ? 's' : ''} processed and saved successfully.`);
+      
+      setUploadSuccess(`✓ Success! ${photoDocs.length} photo(s) uploaded and AI face descriptors saved.`);
+      setSelectedFiles([]);
       setUploadedUrls([]);
       fetchEvents();
-    } catch (err) {
-      setUploadError('Save failed: ' + err.message);
+    } catch (saveErr) {
+      setUploadError('Database save failed: ' + saveErr.message);
     } finally {
-      setProcessingFaces(false);
+      setUploading(false);
     }
   };
 
@@ -847,35 +873,39 @@ export default function AdminDashboard() {
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
                 ${uploadedUrls.length > 0 ? 'bg-rose text-white shadow-rose' : 'bg-rose-pale text-text-muted border border-rose/10'}`}>
                 {uploadedUrls.length > 0 ? '✓' : '2'}
+            <div className="flex items-center gap-2">
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
+                ${uploadSuccess ? 'bg-rose text-white shadow-rose' : 'bg-rose-pale text-text-muted border border-rose/10'}`}>
+                {uploadSuccess ? '✓' : '2'}
               </span>
-              <span className="text-text-primary text-sm font-semibold">Upload to Cloudinary</span>
-              {!CLOUD_NAME && (
-                <span className="text-amber-600 text-[10px] bg-amber-500/10 border border-amber-500/20 rounded px-2.5 py-0.5 font-bold">
-                  Credentials required
+              <span className="text-text-primary text-sm font-semibold">Fast Upload & AI Process</span>
+              {modelsLoading && (
+                <span className="text-text-muted text-[10px] flex items-center gap-1 font-semibold">
+                  <div className="w-3 h-3 border border-rose/20 border-t-rose rounded-full animate-spin"/>
+                  AI loading…
                 </span>
               )}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              {/* Primary: direct REST upload */}
-              <button id="upload-photos-btn"
-                onClick={handleUploadToCloudinary}
-                disabled={isWorking || !selectedFiles.length || !selectedEventId}
+              {/* Primary: direct lightning parallel upload */}
+              <button id="lightning-upload-btn"
+                onClick={handleLightningUploadAndProcess}
+                disabled={isWorking || !selectedFiles.length || !selectedEventId || !modelsReady}
                 className="btn-rose w-full sm:w-auto font-bold shadow-rose">
-                {uploading ? (
-                  <><LoadingSpinner size="sm" />Uploading {uploadProgress.done}/{uploadProgress.total}…</>
+                {isWorking ? (
+                  <><LoadingSpinner size="sm" />Processing {uploadProgress.done}/{uploadProgress.total}…</>
                 ) : (
                   <>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                     </svg>
-                    Upload {selectedFiles.length > 0 ? `${selectedFiles.length} Photo${selectedFiles.length !== 1 ? 's' : ''}` : 'Photos'}
+                    Lightning Upload & Process {selectedFiles.length > 0 ? `(${selectedFiles.length} photo${selectedFiles.length !== 1 ? 's' : ''})` : ''}
                   </>
                 )}
               </button>
 
-              {/* Secondary: Cloudinary widget (if credentials set) */}
+              {/* Secondary: Cloudinary widget (optional — if credentials set) */}
               {CLOUD_NAME && (
                 <button onClick={openWidget} disabled={isWorking || !selectedEventId} className="btn-ghost w-full sm:w-auto text-sm font-semibold">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -902,41 +932,6 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_preset`}
                 <p className="text-text-muted">Then restart the Vite dev server.</p>
               </div>
             )}
-          </div>
-
-          {/* ── STEP 3: Extract faces + save ───────────────────────────────── */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                ${uploadSuccess ? 'bg-rose text-white shadow-rose' : 'bg-rose-pale text-text-muted border border-rose/10'}`}>
-                {uploadSuccess ? '✓' : '3'}
-              </span>
-              <span className="text-text-primary text-sm font-semibold">Extract Faces & Save</span>
-              {modelsLoading && (
-                <span className="text-text-muted text-[10px] flex items-center gap-1 font-semibold">
-                  <div className="w-3 h-3 border border-rose/20 border-t-rose rounded-full animate-spin"/>
-                  AI loading…
-                </span>
-              )}
-            </div>
-
-            <button id="process-photos-btn"
-              onClick={handleProcessAndSave}
-              disabled={isWorking || !uploadedUrls.length || !modelsReady}
-              className="btn-ghost w-full sm:w-auto font-bold">
-              {processingFaces ? (
-                <><LoadingSpinner size="sm" />{uploadProgress.phase}… {uploadProgress.done}/{uploadProgress.total}</>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                  </svg>
-                  Extract Faces & Save {uploadedUrls.length > 0 ? `(${uploadedUrls.length} photos)` : ''}
-                </>
-              )}
-            </button>
-          </div>
 
           {/* ── Progress bar ───────────────────────────────────────────────── */}
           {isWorking && uploadProgress.total > 0 && (
