@@ -31,6 +31,9 @@ await connectDB();
 
 const app = express();
 
+// Trust proxy (crucial for accurate rate limiting when deployed behind Render's load balancer)
+app.set('trust proxy', 1);
+
 // Parse the comma-separated ALLOWED_ORIGINS env var for multi-origin support
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')

@@ -11,9 +11,9 @@ import { rateLimiter } from '../middleware/rateLimiter.js';
 const router = express.Router();
 
 const adminLoginLimiter = rateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts
-  message: 'Too many admin login attempts. Please try again after 15 minutes.',
+  windowMs: 2 * 60 * 1000, // 2 minutes
+  max: 10, // 10 attempts
+  message: 'Too many admin login attempts. Please try again after 2 minutes.',
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

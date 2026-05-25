@@ -121,6 +121,9 @@ export default function AdminDashboard() {
   const [passwordError,     setPasswordError]     = useState('');
   const [passwordSuccess,   setPasswordSuccess]   = useState('');
   const [passwordLoading,   setPasswordLoading]   = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword,     setShowNewPassword]     = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // ── View QR Code Modal State ─────────────────────────────────────────────
   const [showQrModal, setShowQrModal] = useState(false);
@@ -980,7 +983,14 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_preset`}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-canvas/30 backdrop-blur-md flex items-center justify-center z-50 p-4"
-            onClick={() => !passwordLoading && setShowPasswordModal(false)}
+            onClick={() => {
+              if (!passwordLoading) {
+                setShowPasswordModal(false);
+                setShowCurrentPassword(false);
+                setShowNewPassword(false);
+                setShowConfirmPassword(false);
+              }
+            }}
           >
             <motion.div
               initial={{ scale: 0.95, y: 15 }}
@@ -1009,7 +1019,12 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_preset`}
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowPasswordModal(false)}
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setShowCurrentPassword(false);
+                    setShowNewPassword(false);
+                    setShowConfirmPassword(false);
+                  }}
                   disabled={passwordLoading}
                   className="w-8 h-8 rounded-full border border-lavender-light flex items-center justify-center text-text-muted hover:text-rose hover:border-rose/30 transition-colors"
                 >
@@ -1018,43 +1033,100 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_preset`}
               </div>
 
               <form onSubmit={handleChangePassword} className="space-y-4" noValidate>
-                <div className="input-floating">
+                <div className="input-floating relative">
                   <input
                     id="current-password"
-                    type="password"
+                    type={showCurrentPassword ? 'text' : 'password'}
                     placeholder="Current Password"
                     value={currentPassword}
                     onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(''); }}
                     required
                     disabled={passwordLoading}
+                    className="pr-10"
                   />
                   <label htmlFor="current-password">Current Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-rose transition-colors z-10"
+                    tabIndex="-1"
+                  >
+                    {showCurrentPassword ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
 
-                <div className="input-floating">
+                <div className="input-floating relative">
                   <input
                     id="new-password"
-                    type="password"
+                    type={showNewPassword ? 'text' : 'password'}
                     placeholder="New Password"
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }}
                     required
                     disabled={passwordLoading}
+                    className="pr-10"
                   />
                   <label htmlFor="new-password">New Password (min 4 chars)</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-rose transition-colors z-10"
+                    tabIndex="-1"
+                  >
+                    {showNewPassword ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
 
-                <div className="input-floating">
+                <div className="input-floating relative">
                   <input
                     id="confirm-password"
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Confirm New Password"
                     value={confirmPassword}
                     onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(''); }}
                     required
                     disabled={passwordLoading}
+                    className="pr-10"
                   />
                   <label htmlFor="confirm-password">Confirm New Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-rose transition-colors z-10"
+                    tabIndex="-1"
+                  >
+                    {showConfirmPassword ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
 
                 {passwordError && (
