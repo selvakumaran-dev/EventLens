@@ -867,12 +867,8 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* ── STEP 2: Upload to Cloudinary ───────────────────────────────── */}
+          {/* ── STEP 2: Fast Upload & AI Process ─────────────────────────────── */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                ${uploadedUrls.length > 0 ? 'bg-rose text-white shadow-rose' : 'bg-rose-pale text-text-muted border border-rose/10'}`}>
-                {uploadedUrls.length > 0 ? '✓' : '2'}
             <div className="flex items-center gap-2">
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
                 ${uploadSuccess ? 'bg-rose text-white shadow-rose' : 'bg-rose-pale text-text-muted border border-rose/10'}`}>
