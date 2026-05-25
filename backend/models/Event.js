@@ -22,6 +22,8 @@ const eventSchema = new mongoose.Schema(
       type: String,
       trim: true,
       lowercase: true,
+      unique: true,
+      sparse: true,
     },
 
     // Optional: photographer display name shown on guest UI

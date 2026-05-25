@@ -38,8 +38,19 @@ const CameraViewport = forwardRef(function CameraViewport({ onFrame, capturePhas
   // Start camera stream
   useEffect(() => {
     let cancelled = false;
+    // BUG-09 FIX: Timeout so the camera spinner never hangs forever on slow/broken devices
+    let timeoutId = null;
 
     const startCamera = async () => {
+      // Start an 8-second failsafe timer — if getUserMedia hasn't resolved by then, fallback
+      timeoutId = setTimeout(() => {
+        if (!cancelled) {
+          console.warn('[CameraViewport] Camera stream timed out after 8s — switching to file fallback.');
+          setCameraError('Camera took too long to start. Please upload a selfie instead.');
+          setUsingFile(true);
+        }
+      }, 8000);
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -49,6 +60,8 @@ const CameraViewport = forwardRef(function CameraViewport({ onFrame, capturePhas
           },
           audio: false,
         });
+
+        clearTimeout(timeoutId); // Camera started OK — cancel the failsafe
 
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -62,6 +75,7 @@ const CameraViewport = forwardRef(function CameraViewport({ onFrame, capturePhas
         }
         setCameraReady(true);
       } catch (err) {
+        clearTimeout(timeoutId);
         console.warn('Camera access denied:', err.message);
         setCameraError('Camera access was denied. Please upload a selfie instead.');
         setUsingFile(true);
@@ -72,6 +86,7 @@ const CameraViewport = forwardRef(function CameraViewport({ onFrame, capturePhas
 
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);

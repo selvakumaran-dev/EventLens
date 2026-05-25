@@ -234,6 +234,24 @@ router.post('/upload-metadata', verifyAdminToken, async (req, res) => {
         });
       }
 
+      // BUG-10 FIX: Validate that storageUrl actually comes from Cloudinary's CDN.
+      // Without this, a malicious admin token holder could inject arbitrary URLs
+      // from attacker-controlled servers into the database (guests would load from there).
+      try {
+        const parsed = new URL(p.storageUrl);
+        if (!parsed.hostname.endsWith('res.cloudinary.com')) {
+          return res.status(400).json({
+            success: false,
+            message: `photos[${i}].storageUrl must be a Cloudinary CDN URL (res.cloudinary.com).`,
+          });
+        }
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: `photos[${i}].storageUrl is not a valid URL.`,
+        });
+      }
+
       // faceDescriptors is optional (no face detected) but must be an array if present
       if (p.faceDescriptors !== undefined && !Array.isArray(p.faceDescriptors)) {
         return res.status(400).json({

@@ -128,6 +128,7 @@ export default function GuestLogin() {
               id="event-password"
               type={showPass ? 'text' : 'password'}
               placeholder="Event Password"
+              maxLength={100}
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
               autoComplete="off"

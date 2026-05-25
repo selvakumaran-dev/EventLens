@@ -4,32 +4,37 @@ import cors from 'cors';
 import connectDB from './config/db.js';
 import adminRouter from './routes/admin.js';
 import guestRouter from './routes/guest.js';
-import fs from 'fs';
-import path from 'path';
 
-// Automatic PWA Logo copy on boot
-try {
-  const sourcePath = 'C:\\Users\\god\\.gemini\\antigravity\\brain\\8bcd7303-e243-414a-a59d-1de087f0dabb\\eventlens_logo_icon_1779442480485.png';
-  const targetDir = 'C:\\EventLens\\frontend\\public';
-  if (fs.existsSync(sourcePath)) {
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-    }
-    fs.copyFileSync(sourcePath, path.join(targetDir, 'logo.png'));
-    fs.copyFileSync(sourcePath, path.join(targetDir, 'logo192.png'));
-    fs.copyFileSync(sourcePath, path.join(targetDir, 'logo512.png'));
-    console.log('✅ PWA Setup: Successfully copied brand logos to frontend/public');
-  } else {
-    console.warn('⚠️ PWA Setup: Logo source path not found at ' + sourcePath);
-  }
-} catch (err) {
-  console.error('❌ PWA Setup: Error copying logos:', err);
+// ── BUG-01: Guard against weak / default JWT secret in production ─────────────
+if (
+  process.env.NODE_ENV === 'production' &&
+  (!process.env.JWT_SECRET ||
+    process.env.JWT_SECRET.includes('change_this') ||
+    process.env.JWT_SECRET.includes('secret') ||
+    process.env.JWT_SECRET.length < 32)
+) {
+  console.error('❌  FATAL: JWT_SECRET is missing, too short, or uses the default placeholder value.');
+  console.error('   Generate one with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+  process.exit(1);
 }
 
 // ── Connect to MongoDB Atlas ─────────────────────────────────────────────────
 await connectDB();
 
 const app = express();
+
+// ── BUG-03: HTTP Security Headers via inline middleware (no helmet dep needed) ─
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // Trust proxy (crucial for accurate rate limiting when deployed behind Render's load balancer)
 app.set('trust proxy', 1);
@@ -40,14 +45,23 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .map((o) => o.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
+// ── BUG-04: Fixed CORS — null-origin bypass only allowed in development ────────
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, curl) in dev
-      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
+      // BUG-04 FIX: Only allow no-origin requests in development (Postman, curl etc.)
+      // In production, all requests MUST have an Origin header that matches whitelist
+      if (!origin && process.env.NODE_ENV !== 'production') {
         return callback(null, true);
       }
-      console.warn(`⚠️ CORS blocked request from origin: ${origin}`);
+
+      if (origin && allowedOrigins.includes(origin.replace(/\/$/, ''))) {
+        return callback(null, true);
+      }
+
+      if (origin) {
+        console.warn(`⚠️ CORS blocked request from origin: ${origin}`);
+      }
       callback(null, false);
     },
     credentials: true,
@@ -95,6 +109,9 @@ app.use((err, _req, res, _next) => {
 const PORT = parseInt(process.env.PORT || '5000', 10);
 app.listen(PORT, () => {
   console.log(`🚀  EventLens API running on http://localhost:${PORT}`);
-  console.log(`    Environment : ${process.env.NODE_ENV || 'development'}`);
-  console.log(`    Allowed origins: ${allowedOrigins.join(', ') || '(all)'}`);
+  // BUG-13 FIX: Only log sensitive infra details in development
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`    Environment : ${process.env.NODE_ENV || 'development'}`);
+    console.log(`    Allowed origins: ${allowedOrigins.join(', ') || '(all — dev mode)'}`);
+  }
 });

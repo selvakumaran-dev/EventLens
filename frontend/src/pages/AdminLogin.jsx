@@ -55,6 +55,7 @@ export default function AdminLogin() {
               id="admin-secret"
               type={showSecret ? 'text' : 'password'}
               placeholder="Admin Secret"
+              maxLength={100}
               value={secret}
               onChange={(e) => { setSecret(e.target.value); setError(''); }}
               autoComplete="current-password"

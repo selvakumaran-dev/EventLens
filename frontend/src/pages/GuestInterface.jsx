@@ -125,6 +125,7 @@ export default function GuestInterface() {
   const [showConfetti,   setShowConfetti]   = useState(false);
   const [zipping,        setZipping]        = useState(false);
   const [zipProgress,    setZipProgress]    = useState('');
+  const [zipWarning,     setZipWarning]     = useState('');
 
   // 3-Angle biometric scanning state variables
   const [capturePhase,    setCapturePhase]    = useState('front'); // 'front' | 'left' | 'right'
@@ -301,6 +302,7 @@ export default function GuestInterface() {
     if (photos.length === 0) return;
     setZipping(true);
     setZipProgress('Initializing ZIP engine...');
+    setZipWarning('');
     try {
       if (!window.JSZip) {
         await new Promise((res, rej) => {
@@ -313,14 +315,25 @@ export default function GuestInterface() {
       }
       
       const zip = new window.JSZip();
+      let failedCount = 0;
       
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
         setZipProgress(`Downloading photo ${i + 1} of ${photos.length}...`);
         
-        const response = await fetch(photo.storageUrl);
-        const blob = await response.blob();
-        zip.file(`eventlens-photo-${photo._id || i + 1}.jpg`, blob);
+        try {
+          const response = await fetch(photo.storageUrl);
+          if (!response.ok) throw new Error(`Status ${response.status}`);
+          const blob = await response.blob();
+          zip.file(`eventlens-photo-${photo._id || i + 1}.jpg`, blob);
+        } catch (fetchErr) {
+          console.warn(`⚠️ Failed to download photo ${photo._id || i + 1} for ZIP:`, fetchErr.message);
+          failedCount++;
+        }
+      }
+
+      if (failedCount === photos.length) {
+        throw new Error('All photo downloads failed. Please check your internet connection.');
       }
       
       setZipProgress('Generating ZIP package...');
@@ -337,8 +350,12 @@ export default function GuestInterface() {
       URL.revokeObjectURL(url);
       
       setZipProgress('');
+      if (failedCount > 0) {
+        setZipWarning(`✓ Download complete, but ${failedCount} photo(s) couldn't be included due to network or Cloudinary errors.`);
+      }
     } catch (err) {
       console.error('ZIP compilation failed:', err);
+      setZipWarning(`❌ Failed to compile ZIP: ${err.message}`);
     } finally {
       setZipping(false);
     }
@@ -584,6 +601,17 @@ export default function GuestInterface() {
               : '🔒 Strict: Filters out any potential lookalikes. Shows only clear, front-facing matches of you.'}
           </p>
         </div>
+
+        {/* Zip Warning / Success Banners */}
+        {zipWarning && (
+          <div className={`mx-4 p-3 rounded-xl border text-xs font-semibold text-center ${
+            zipWarning.startsWith('❌') 
+              ? 'bg-red-500/10 border-red-500/20 text-red-600' 
+              : 'bg-amber-500/10 border-amber-500/20 text-amber-700'
+          }`}>
+            {zipWarning}
+          </div>
+        )}
 
         {/* Dynamic ZIP Batch Download and Progress */}
         {zipping && (

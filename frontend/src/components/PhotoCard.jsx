@@ -16,7 +16,7 @@ export default function PhotoCard({ photo, index }) {
 
   const dist = photo._matchDistance;
   const matchPct = dist !== undefined
-    ? Math.max(60, Math.min(99, Math.round(99 - (dist / 0.6) * 39)))
+    ? Math.max(45, Math.min(99, Math.round(99 - (dist / 0.6) * 54)))
     : null;
 
   const handleDownload = async (e) => {

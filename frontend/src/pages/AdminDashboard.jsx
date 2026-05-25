@@ -261,6 +261,7 @@ export default function AdminDashboard() {
     }
 
     setUploading(true);
+    setProcessingFaces(true);
     setUploadError('');
     setUploadSuccess('');
     setUploadProgress({ done: 0, total: selectedFiles.length, phase: 'Initializing parallel workers...' });
@@ -349,6 +350,7 @@ export default function AdminDashboard() {
     }
     // Wait for trailing workers to complete
     await Promise.all(executing);
+    setProcessingFaces(false);
 
     // Clean up all object URLs to release memory
     selectedFiles.forEach((item) => {
@@ -535,16 +537,19 @@ export default function AdminDashboard() {
             <form onSubmit={handleCreateEvent} className="space-y-4" noValidate>
               <div className="input-floating">
                 <input id="event-name" type="text" placeholder="Event Name"
+                  maxLength={120}
                   value={newEventName} onChange={(e) => { setNewEventName(e.target.value); setCreateError(''); }} required />
                 <label htmlFor="event-name">Event Name</label>
               </div>
               <div className="input-floating">
                 <input id="event-pass" type="text" placeholder="Guest Password"
+                  maxLength={100}
                   value={newEventPass} onChange={(e) => { setNewEventPass(e.target.value); setCreateError(''); }} required />
                 <label htmlFor="event-pass">Guest Password</label>
               </div>
               <div className="input-floating">
                 <input id="photographer" type="text" placeholder="Photographer Name"
+                  maxLength={80}
                   value={photographer} onChange={(e) => setPhotographer(e.target.value)} />
                 <label htmlFor="photographer">Photographer (optional)</label>
               </div>
@@ -1038,6 +1043,7 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_preset`}
                     id="current-password"
                     type={showCurrentPassword ? 'text' : 'password'}
                     placeholder="Current Password"
+                    maxLength={100}
                     value={currentPassword}
                     onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(''); }}
                     required
@@ -1070,6 +1076,7 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_preset`}
                     id="new-password"
                     type={showNewPassword ? 'text' : 'password'}
                     placeholder="New Password"
+                    maxLength={100}
                     value={newPassword}
                     onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); }}
                     required
@@ -1102,6 +1109,7 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_preset`}
                     id="confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Confirm New Password"
+                    maxLength={100}
                     value={confirmPassword}
                     onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(''); }}
                     required

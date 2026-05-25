@@ -137,7 +137,7 @@ export function findMatchingPhotosAsync(
   strictThreshold = 0.45,
   looseThreshold  = 0.60
 ) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     // Standardize guestDescriptor into an array of serializable arrays
     const isMulti = Array.isArray(guestDescriptor[0]) || guestDescriptor[0] instanceof Float32Array;
     const descriptorsArray = isMulti
@@ -201,6 +201,14 @@ export function findMatchingPhotosAsync(
     worker.onmessage = (e) => {
       resolve(e.data);
       worker.terminate();
+    };
+
+    // BUG-06 FIX: Handle worker runtime errors so the Promise never hangs forever.
+    // Without this, any crash inside the worker leaves the guest stuck in SCANNING state permanently.
+    worker.onerror = (e) => {
+      console.error('[faceMatching] Web Worker crashed:', e.message);
+      worker.terminate();
+      reject(new Error('Face matching failed. Please try scanning again.'));
     };
 
     worker.postMessage({
