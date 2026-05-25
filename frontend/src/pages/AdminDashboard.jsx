@@ -928,6 +928,7 @@ VITE_CLOUDINARY_UPLOAD_PRESET=your_preset`}
                 <p className="text-text-muted">Then restart the Vite dev server.</p>
               </div>
             )}
+          </div>
 
           {/* ── Progress bar ───────────────────────────────────────────────── */}
           {isWorking && uploadProgress.total > 0 && (
